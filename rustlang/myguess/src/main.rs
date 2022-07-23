@@ -1,7 +1,8 @@
 use std::io;
 use rand::Rng;
 use std::cmp::Ordering;
-
+//gen_range很多地方是两个参数 这里是1..101
+//let match是一个语句最后的}后要跟分号
 fn main() {
 
     println!("let us begin play guess game");
