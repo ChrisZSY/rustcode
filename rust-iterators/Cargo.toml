@@ -1,0 +1,8 @@
+[package]
+name = "iterators"
+version = "0.1.0"
+authors = ["rustomax"]
+
+[dependencies]
+itertools = "0.10.0"
+char-iter = "0.1"
