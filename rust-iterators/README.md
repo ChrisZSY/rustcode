@@ -1,206 +1,195 @@
-# rust-iterators
+# rust 迭代器 (iterator) 详解
 
-Demonstrates basic Rust iterator use.
+​      
 
-[![Build Status](https://travis-ci.org/rustomax/rust-iterators.svg?branch=master)](https://travis-ci.org/rustomax/rust-iterators)
+# 翻译来源
 
-The goal of this tutorial is to provide a handy reference to some of the common iterator patterns. It is not meant to be a replacement for the [Iterator API reference](https://doc.rust-lang.org/std/iter/trait.Iterator.html) or an overview of the core iterator concepts described in [The Book](https://doc.rust-lang.org/book/ch13-02-iterators.html). In fact, this tutorial relies on both resources.
+https://github.com/rustomax/rust-iterators
 
-> To take full advantage of the material described here, it is recommended that you have at least cursory familiarity with Rust.
+这篇文章的目的是为一些常见的[iterator](https://so.csdn.net/so/search?q=iterator&spm=1001.2101.3001.7020)提供参考资料。并不能替代[Iterator 
+ API](https://doc.rust-lang.org/std/iter/trait.Iterator.html)或者[书中的Rust iterator核心概念 ](https://doc.rust-lang.org/book/second-edition/ch13-02-iterators.html)，事实上这篇文章的内容来自以上两种内容。
 
-How to compile and run sample code:
+> 为了更好理解本篇文章内容，推荐读者至少粗略了解[Rust](https://so.csdn.net/so/search?q=Rust&spm=1001.2101.3001.7020)
 
-```sh
+# 如何编译运行例子
+
+```
 git clone https://github.com/rustomax/rust-iterators.git
 cd rust-iterators/
-cargo run
+cargo run123
 ```
 
-## Contents
+代码中使用了`nightly`版本的特性，如果你的Rust 为`statble`版本，请注释相应的代码区域。
 
-- [Introduction](#introduction)
-- [Basic Ranges](#basic-ranges)
-- [Digging Deeper](#digging-deeper)
-- [Iterating over Arrays](#iterating-over-arrays)
-- [Combining Iterator Adaptors](#combining-iterator-adaptors)
-- [Ranges of Characters](#ranges-of-characters)
-- [Iterating over Vectors](#iterating-over-vectors)
-- [Infinity and Beyond](#infinity-and-beyond)
-- [Itertools](#itertools)
-- [Creating Your Own Iterators](#creating-your-own-iterators)
+# 0介绍
 
-## Introduction
+生活是重复的，其中的大部分事物都是成系列的。我们经常需要记录(count)、列举 
+ (enumerate)、反复申明(iterate)这些事物。在编程中，有多种方式产生重复事物(repetition)，其中最为人熟知的是C风格的for循环。
 
-Life is repetitive and most things in it come as series of items. Programmatically we often need to count, enumerate, and iterate over these sequences. There are several ways to generate repetition in programming languages. One of the most prominent constructs is C-style `for` loop with familiar syntax:
-
-```c
+```
 for ( x = 0; x < 10; ++x ) {
   // do something
-}
+}123
 ```
 
-While this venerable method is powerful and flexible enough to accommodate many scenarios, it is also responsible for a fair share of bugs ranging from misplaced semicolons to unintentionally mutating the iterator variable inside the loop. In the spirit of safety and consistency with other language features, the C-style `for` loop is absent from Rust. Instead, Rust leverages *iterators* to achieve similar goals (and a lot more).
+虽然这种可行的方法足够强大而且足够灵活以适应多种情况，但它承担着对应的bug份额，例如错误分号放置、无意中在循环内部修改变量。本着与其他语言特性的安全和一致的精神，Rust中没有C风格的循环。 相反，Rust利用[迭代器](https://so.csdn.net/so/search?q=迭代器&spm=1001.2101.3001.7020)实现类似的目标（还有更多）。
 
-## Basic Ranges
+# 1.基本Range
 
-The most basic way to loop over a series of integers in Rust is the range. Range is created using `..` notation and produces an iterator of integers incremented by `1`:
+在Rust中循环一系列整数的最基本的方法是Range。Range由`..`标记产生，它生成步长为1的iterator 。
 
-```rust
+```
 for i in 1..11 {
     print!("{} ", i);
 }
-// output: 1 2 3 4 5 6 7 8 9 10
+// output: 1 2 3 4 5 6 7 8 9 101234
 ```
 
- The code above will print a series of numbers from `1` to `10`, and not include the last number `11`. In other words, the `..` produces an iterator that is inclusive on the left and exclusive on the right. In order to get a range that is inclusive on both ends, you use the `..=` notation:
+上面的代码将打印从1到10的一系列数字，而不包括最后一个数字11.换句话说，`..`会产生一个iterator ，它包含左边的数，排除在右边的数。 为了得到一个包含两端的范围的iterator，你使用`...`符号。 包含两端的范围的iterator目前是一个不稳定的功能，需要`nightly`编译器
 
-```rust
-for i in 1..=10 {
+```
+#![feature(inclusive_range_syntax)]
+
+for i in 1...10 {
   print!("{} ", i);
 }
-// output: 1 2 3 4 5 6 7 8 9 10
+// output: 1 2 3 4 5 6 7 8 9 10123456
 ```
 
-If you do not use the loop iterator variable, you can avoid instantiating it by leveraging the `_` pattern. For instance, the following code prints out the number of elements in the iterator without instantiating a loop iterator variable:
+如果你不使用循环迭代器变量，你可以通过利用`_`来避免实例化它。 例如，下面的代码不需要实例化一个循环迭代器变量就可以输出迭代器中元素的数量：
 
-```rust
+```
 let mut n: i32 = 0;
 for _ in 0..10 {
   n += 1;
 }
 println!("num = {}", n);
-// output: num = 10
+// output: num = 10123456
 ```
 
-The example above is somewhat contrived since iterators in Rust have `count()` function, which returns the number of elements in the iterator without the need to count them in a loop:
+上面的例子是有些多余，因为Rust中的迭代器有count()函数，它返回迭代器中元素的数量，而不需要在循环中对它们进行计数：
 
-```rust
+```
 println!("num = {}", (0..10).count());
-// output: num = 10
+// output: num = 1012
 ```
 
-> You will find that experienced Rust programmers are able to express in very terse iterator language what otherwise would have taken many more lines of conventional looping code. We cover some of these patterns below as we talk about adaptors, consumers and chaining iterator methods into complex statements.
+> 你会发现有经验的Rust程序员能够用非常简洁的迭代器语言来表达，而不是采用的传统循环代码行。 当我们谈论适配器(adaptor)，消费者(consumer)和将迭代器方法链接(chaining)到复杂的语句时，我们将覆盖下面的一些模式。
 
-## Digging Deeper
+# 2.深层发掘（Digging Deeper）
 
-If the basic incremental sequential range does not satisfy your needs, there are plenty of ways in Rust to customize the range iterators. Let's look at a few common ones.
+如果基本的增量顺序Range 不能满足你的需要，Rust中有很多方法来定制Range迭代器。 我们来看几个常见的问题。
 
-Often, a range needs to be incremented not by `1`, but by a different number.
+通常，Range递增不是1，而是增加一个不同的数字。 这可以通过`filter()`方法来实现。 它应用一个闭包(closure)，它可以为迭代器的每个元素返回true或false，并产生一个只包含闭包返回true的元素的迭代器。
 
-The `step_by()` method allows you to do just that
+下面的迭代器将产生一个0到20之间的偶数序列。
 
-```rust
-for i in (0..11).step_by(2) {
-    print!("{} ", i);
-}
-
-//output: 0 2 4 6 8 10
 ```
-
-Alternatively, same result can be achieved with the `filter()` method. It applies a *closure* that can return either `true` or `false` to each element of an iterator and produces a new iterator that only contains elements for which the closure returns `true`.
-
-The following iterator will produce a sequence of even numbers between 0 and 20.
-
-```rust
 for i in (0..21).filter(|x| (x % 2 == 0)) {
   print!("{} ", i);
 }
-// output: 0 2 4 6 8 10 12 14 16 18 20
+// output: 0 2 4 6 8 10 12 14 16 18 201234
 ```
 
-Because `filter()` uses closures, it is very flexible and can be used to produce iterators that evaluate complex conditions. For instance, the following iterator produces a series of integers in the range between 0 and 20 that divide by both `2` and `3` without a remainder:
+因为`filter()`使用闭包，所以非常灵活，可以用来生成复杂迭代器。 例如，下面的迭代器产生0到20之间的一系列整数，它们除以2和3得到余数：
 
-```rust
+```
 for i in (0..21).filter(|x| (x % 2 == 0) && (x % 3 == 0)) {
   print!("{} ", i);
 }
-// output: 0 6 12 18
+// output: 0 6 12 181234
 ```
 
-While by default ranges are incremental, they can easily be reversed using the `rev()` method.
+虽然默认范围是递增的，但是使用`rev()`方法可以很容易地将其反转。
 
-```rust
+```
 for i in (0..11).rev() {
   print!("{} ", i);
 }
-// output: 10 9 8 7 6 5 4 3 2 1 0
+// output: 10 9 8 7 6 5 4 3 2 1 01234
 ```
 
-Another common iterator adaptor, `map()`, applies a closure to each element, and returns the resulting iterator. Here is an example of an iterator that produces a sequence of squares of numbers from `1` to `10`:
+另一个常见的迭代器适配器`map()`将闭包应用于每个元素，并返回结果迭代器。下面是一个迭代器的例子，它产生一个从1到10的数字的正方形序列：
 
-```rust
+```
 for i in (1..11).map(|x| x * x) {
     print!("{} ", i);
 }
-// output: 1 4 9 16 25 36 49 64 81 100
+// output: 1 4 9 16 25 36 49 64 81 1001234
 ```
 
-`fold()` is a very powerful method. It returns the result of applying a special "accumulator" type of closure to all elements of an iterator resulting in a single value. The following iterator produces a sum of squares of numbers from 1 to 5.
+`fold()`是一个非常强大的方法。 它返回一个特殊的“累加器”类型闭包的结果给迭代器的所有元素，得到一个单一的值。 下面的迭代器产生从1到5的数字的平方和。
 
-```rust
-let result = (1..=5).fold(0, |acc, x| acc + x * x);
+```
+#![feature(inclusive_range_syntax)]
+
+let result = (1...5).fold(0, |acc, x| acc + x * x);
 println!("result = {}", result);
 
-// output: result = 55
+// output: result = 55123456
 ```
 
-Perhaps the easiest way to understand what is happening here is to rewrite the example above in a more procedural fashion:
+也许理解这里发生的最简单的方法是以更程序化的方式重写上面的例子：
 
-```rust
+```
+#![feature(inclusive_range_syntax)]
+
 let mut acc = 0;
 
-for x in 1..=5 {
+for x in 1...5 {
   acc += x * x;
 }
 
 let result = acc;
 println!("result = {}", result);
 
-// output: result = 55
+// output: result = 55123456789101112
 ```
 
-Wow! Isn't the `fold()` version so much more concise and readable?
+哇！`fold()`版本是不是更加简洁和可读？
 
-## Iterating over Arrays
+# 3.[数组](https://so.csdn.net/so/search?q=数组&spm=1001.2101.3001.7020)迭代（Iterating over Arrays）
 
-Similarly to iterating over ranges, we can iterate over an array. The benefit of this is that arrays can contain values of arbitrary types, not just integrals. The only caveat is that array is **not** an iterator. We need to turn it into an iterator using the `iter()` method.
+与迭代Range类似，我们可以迭代一个数组。 这样做的好处是数组可以包含任意类型的值，而不仅仅是整数。 唯一的警告是该数组不是一个迭代器。 我们需要使用`iter()`方法把它变成一个迭代器。
 
-```rust
+```
 let cities = ["Toronto", "New York", "Melbourne"];
 
 for city in cities.iter() {
   print!("{}, ", city);
 }
-// output: Toronto, New York, Melbourne,
+// output: Toronto, New York, Melbourne,123456
 ```
 
-## Combining Iterator Adaptors
+# 4.组合迭代器适配器（Combining Iterator Adaptors）
 
-While in the previous sections we covered a good variety of methods allowing you to generate many different types of iterators, the real power of Rust shines when you start combining these approaches.
+在前面的章节中，我们介绍了各种各样的方法，可以让你生成许多不同类型的迭代器，当你开始结合这些方法的时候，Rust表现十分突出。
 
-What if you wanted an inclusive range between `10` and `0` that is decremented by `2`? This is easily accomplished by combining a couple of methods into a single iterator:
+如果你想要一个`10`到`0`之间以步长`2`Range呢？ 通过将一个特性和几个方法组合到一个迭代器中可以很容易地完成这个任务：
 
-```rust
-for i in (0..=10).rev().filter(|x| (x % 2 == 0)) {
+```
+#![feature(inclusive_range_syntax)]
+
+for i in (0...10).rev().filter(|x| (x % 2 == 0)) {
   print!("{} ", i);
 }
-// output: 10 8 6 4 2 0
+// output: 10 8 6 4 2 0123456
 ```
 
-Need a non-contiguous range (basically a combination of two non-adjacent ranges)? You can combine multiple ranges with the `chain()` method:
+需要一个不连续的Range（基本上是两个不相Range的组合）？ 您可以使用`chain()`方法组合多个范围：
 
-```rust
+```
 let c = (1..4).chain(6..9);
 
 for i in c {
   print!("{} ", i);
 }
-// output: 1 2 3 6 7 8
+// output: 1 2 3 6 7 8123456
 ```
 
-You can get very creative combining things! Below is an iterator that combines two ranges: the first one is incremented and filtered, another one - decremented. Not sure what such an abomination could be used for, but here it is nonetheless!
+你可以得到很有创意的组合的东西！ 下面是一个迭代器，结合了两个范围：第一个递增和过滤，另一个 是递减。 不知道这样一个可憎的东西怎么产生，但在这里却是实现！
 
-```rust
+```
 let r = (1..20)
   .filter(|&x| x % 5 == 0)
   .chain((6..9).rev());
@@ -208,15 +197,15 @@ let r = (1..20)
 for i in r {
   print!("{} ", i);
 }
-// output: 5 10 15 8 7 6
+// output: 5 10 15 8 7 612345678
 ```
 
-> Notice how in the example above Rust allows us to visually better represent complex iterator statements by splitting them into multiple lines.
+> 请注意，在上面的例子中，Rust允许我们通过将复杂的迭代器语句拆分为多行来更好地表示复杂的迭代器语句。
 
-Another handy method is `zip()`. It is somewhat similar to `chain()` in that it combines two iterators into one. By contrast with `chain()`, `zip()` produces not a contiguous iterator, but an iterator of tuples:
-![zip() method](https://cloud.githubusercontent.com/assets/20992642/17650212/185c5486-6216-11e6-8fd7-34d2aa976c07.PNG)
+另一个方便的方法是`zip()`。 它有点类似于`chain()`，因为它将两个迭代器合并为一个。 与`chain()`相比，`zip()`不产生连续的迭代器，而是产生元组(tuple)的迭代器： 
+ ![这里写图片描述](https://cloud.githubusercontent.com/assets/20992642/17650212/185c5486-6216-11e6-8fd7-34d2aa976c07.PNG)
 
-```rust
+```
 let cities = ["Toronto", "New York", "Melbourne"];
 let populations = [2_615_060, 8_550_405, ‎4_529_500];
 
@@ -228,103 +217,101 @@ for (c, p) in matrix {
 // output:
 // Toronto   : population = 2615060
 // New York  : population = 8550405
-// Melbourne : population = 4529500
+// Melbourne : population = 4529500123456789101112
 ```
 
-## Ranges of Characters
+# 5.字符Range（Ranges of Characters）
 
-Programs that manipulate strings or text often require the ability to iterate over a range of characters. The [char_iter crate](https://docs.rs/char-iter/0.1.0/char_iter/) provides convenient way to generate such ranges. `char_iter` supports Unicode characters.
+操作字符串或文本的字节数通常需要迭代字符Range的能力。 `char_iter`提供了方便的方法来产生这样的范围。 `char_iter`支持Unicode字符。
 
-To use the `char_iter`, put the following in your `Cargo.toml`
+要使用`char_iter`，请在`Cargo.toml`中添加以下内容
 
-```toml
+```
 [dependencies]
-char-iter = "0.1"
+char-iter = "0.1"12
 ```
 
-And then generate a character range with `char_iter::new()` method:
+接着通过`char_iter::new()`产生字符Range
 
-```rust
+```
 extern crate char_iter;
 
 for c in char_iter::new('Д', 'П') {
   print!("{} ", c);
 }
-// output: Д Е Ж З И Й К Л М Н О П
+// output: Д Е Ж З И Й К Л М Н О П123456
 ```
 
-## Iterating over Vectors
+# 6.向量迭代（Iterating over Vectors）
 
-Vector is one of Rust's fundamental structures. By its nature it is well suited to represent series of repetitive items. There are a number of language facilities in Rust that allow using vectors as iterators and vice-versa.
+向量是Rust的基本结构之一。 就其性质而言，它非常适合于表示一系列重复项目。 Rust中有许多语言工具允许使用向量作为迭代器，反之亦然。
 
-In the simplest case, similarly to how we created an iterator from an array, we can create an iterator from a vector using the `iter()` method. In fact this is considered to be the most idiomatic way in Rust to iterate over a vector.
+在最简单的情况下，类似于我们如何从数组创建迭代器，我们可以使用`iter()`方法从矢量创建迭代器。 事实上，这被认为是Rust在迭代向量中最习惯的方式。
 
-```rust
+```
 let nums = vec![1, 2, 3, 4, 5];
 
 for i in nums.iter() {
    print!("{} ", i);
 }
-// output: 1 2 3 4 5
+// output: 1 2 3 4 5123456
 ```
 
-As a matter of fact, the pattern above is so common that rust provides syntactic sugar for it in the form of the reference operator `&`.
+事实上，上面的模式非常普遍，Rust的引用操作符`＆`为其提供了句法糖。
 
-```rust
+```
 let nums = vec![1, 2, 3, 4, 5];
 for i in &nums {
    print!("{} ", i);
 }
-// output: 1 2 3 4 5
+// output: 1 2 3 4 512345
 ```
 
-Notice that the borrows above are immutable. In other words, they are read-only. If we want to make changes to our vector, we have to use the mutable borrow `&mut`. For instance, the following code will mutably iterate over a vector doubling each element in the process.
+注意上面的借用(borrow)是不可改变的。 换句话说，它们是只读的。 如果我们想要改变我们的向量，我们必须使用可变的借用`＆mut`。 例如，下面的代码将可变地迭代一个矢量，使处理中的每个元素加倍。
 
-```rust
+```
 let mut nums = vec![1, 2, 3, 4, 5];
 for i in &mut nums {
     *i *= 2;
 }
 println!("{:?}", nums);
 
-//output: [2, 4, 6, 8, 10]
+//output: [2, 4, 6, 8, 10]1234567
 ```
 
-However, now that you are an iterator ninja, you wouldn't use the `for` loop syntax above. You'd go with a `map()` instead, right?
+然而，现在你是一个迭代忍者()，你不会使用上面的`for`循环语法。 你会用一个地`map()`来代替，对吗？
 
-```rust
+```
 let nums = vec![1, 2, 3, 4, 5];
-let nums = nums.iter().map(|x| x * 2).collect::<Vec<i32>>();
+let nums = nums.iter().map(|x| x * 2);
 println!("{:?}", nums);
 
-//output: [2, 4, 6, 8, 10]
+//output: [2, 4, 6, 8, 10]12345
 ```
 
-> A slight digression. What if we wanted to use mutable iterator to add elements to the vector like so:
+> 轻微的离题。 如果我们想要使用可变的迭代器将元素添加到向量中，如下所示：
 >
->  ```rust
->  let mut nums = vec![1, 2, 3, 4, 5];
->  for i in &mut nums {
->      nums.push(*i);
->  }
->  println!("{:?}", nums);
->  ```
+> ```
+> let mut nums = vec![1, 2, 3, 4, 5];
+> for i in &mut nums {
+>     nums.push(*i);
+> }
+> println!("{:?}", nums);12345
+> ```
 >
-> This won't compile with the error message `cannot borrow nums as mutable more than once at a time.` You see, our iterator (instantiated in the `for` loop) already borrowed `nums` as mutable. The `push` expression tries to do that again, which is prohibited in rust. This is rust's famous safety at work. If we could `push` something into the vector, while iterating over it, this would invalidate the iterator causing undefined behavior. Rust prevents this from happening at compile time. Not only iterators are powerful, but they are also super safe.
+> 它不编译，并抛出错误信息`cannot borrow `nums` as mutable more than once at a time`。 你看，我们的迭代器（在`for`循环中实例化）已经借用nums作为可变。 `push`表达试图再次这样做，这是禁止的。 这是在Rust中著名的安全机制。 如果我们可以将某个`push`入向量中，同时迭代它，则会导致迭代器失效，从而导致未定义的行为。 Rust可以在编译时防止发生这种情况。 迭代器不仅强大，而且它们也是超级安全的。
 
-Now, let's do the opposite - create a vector from an iterator. In order to do that we need what is called a *consumer*. Consumers force *lazy* iterators to actually produce values.
+现在，我们做相反的事情 : 从迭代器创建一个向量。 为了做到这一点，我们需要所谓的消费者。 消费者迫使懒惰的迭代器实际产生值。`collect()`是一个普通的消费者。 它从一个迭代器获取值并将它们转换为所需类型的集合。 下面我们将从`1`到`10`的一系列数字变换成一个向量`i32`：
 
-`collect()` is a common consumer. It takes values from an iterator and converts them into a collection of required type. Below we are taking a range of numbers from `1` to `10` and transforming it into a vector of `i32`:
-
-```rust
+```
 let v = (1..11).collect::<Vec<i32>>();
 println!("{:?}", v);
-// output: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+// output: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]123
 ```
 
-To get both the element of a vector and its index, you can use `enumerate()` method, which returns a tuple containing the index and the item on each iteration:
+为了获得向量的元素及其索引，可以使用`enumerate()`方法，该方法在每次迭代中返回一个包含索引和项目的元组：
 
-```rust
+```
 let v = vec![1, 2, 3];
 for (i, n) in v.iter().enumerate() {
     println!("v[{}] = {}", i, n);
@@ -332,48 +319,47 @@ for (i, n) in v.iter().enumerate() {
 // output:
 // v[0] = 1
 // v[1] = 2
-// v[2] = 3
+// v[2] = 312345678
 ```
 
-There are a few other functions, that make using iterators on vectors particularly helpful.
+还有一些其他的功能，使向量上的迭代器特别有用。 
+ `min()`和`max()`，例如返回Option，分别包含向量元素的最小值和最大值：
 
-`min()` and `max()`, for instance, return options, containing minimum and maximum values of the vector elements respectively:
-
-```rust
+```
 let v = vec![3, 5, 0, -2, 3, 4, 1];
 let max = v.iter().max();
 let min = v.iter().min();
 
 println!("max = {:?}, min = {:?}", max, min);
 
-// output: max = Some(5), min = Some(-2)
+// output: max = Some(5), min = Some(-2)1234567
 ```
 
-`sum()` returns a sum of all values in an iterator. The following program leverages the `sum()` method to compute the grade point average of a rather mediocre student:
+`sum()`返回迭代器中所有值的总和。 以下程序利用`sum()`方法来计算一个相当平庸的学生的平均成绩：
 
-```rust
+```
 let grades = vec![4, 5, 6, 9, 7, 4, 8];
 let sum: i32 = grades.iter().sum();
 let gpa = sum as f32 / grades.len() as f32;
 
 println!("sum = {}, gpa = {:.2}", sum, gpa);
 
-// output: sum = 43, gpa = 6.14
+// output: sum = 43, gpa = 6.141234567
 ```
 
-## Infinity and Beyond
+# 7.无限与超越(Infinity and Beyond)
 
-So far we have dealt with iterators that operated on some finite range of values. Rust generalizes iterators in such a way that it is in fact possible to create an infinite range! Let us consider the following example:
+到目前为止，我们已经处理了在某些有限范围的值上运行的迭代器。 Rust以这种方式推广迭代器，实际上可以创建一个无限范围！ 让我们考虑下面的例子：
 
-```rust
-let r = (1..).collect::<Vec<i32>>();
+```
+let r = (1..).collect::<Vec<i32>>();1
 ```
 
-The `(1..)` defines a range that starts with `1` and increments indefinitely. In practice, such program compiles and runs, but eventually crashes with the error message: `fatal runtime error: out of memory`. Well, that's not very practical, you might say. Indeed, by themselves infinite ranges are pretty useless. What makes them useful is combining them with other adaptors and consumers.
+`(1..)`定义了一个从1开始并且无限增量的Range。 实际上，这样的程序编译和运行，但最终崩溃的错误消息：`fatal runtime error: out of memory`。 那么，你可能会说这不是很实际。 事实上，无限范围本身是无用的。 让他们有用的是将他们与其他适配器和消费者结合起来。
 
-One particularly helpful pattern involves using the `take()` method to limit the number of items returned by the iterator. The following iterator will return the first `10` items in a sequence of squares of integers that are divisible by `5` without a remainder.
+一个特别有用的模式涉及使用`take()`方法来限制迭代器返回的项目数量。 下面的迭代器将返回可以被`5`整除的整数的正方形序列中的前`10`个。
 
-```rust
+```
 let v = (1..)
   .map(|x| x * x)
   .filter(|x| x % 5 == 0 )
@@ -382,23 +368,36 @@ let v = (1..)
 
 println!("{:?} ", v);
 
-// output: [25, 100, 225, 400, 625, 900, 1225, 1600, 2025, 2500]
+// output: [25, 100, 225, 400, 625, 900, 1225, 1600, 2025, 2500]123456789
 ```
 
-## Itertools
+# 8.Itertools
 
-The [itertools crate](https://docs.rs/itertools/0.10.0/itertools) contains powerful additional iterator adaptors. Below are some examples.
+[itertools](https://docs.rs/itertools/0.6.0/itertools)包含强大的附加迭代器适配器。 以下是一些例子。
 
-To use `itertools`, add the following to your `Cargo.toml`:
+为了使用`itertools`，需要在`Cargo.toml`加入如下配置：
 
-```toml
+```
 [dependencies]
-itertools = "0.10.0"
+itertools = "0.6"12
 ```
 
-The `unique()` adaptor eliminates duplicates from an iterator. The duplicates do not need to be sequential.
+请回忆我们如何使用`filter()`生成一个偶数范围？ `Itertools`有一个方便的`step()`方法。
 
-```rust
+```
+extern crate itertools;
+use itertools::Itertools;
+
+for i in (0..11).step(2) {
+    print!("{} ", i);
+}
+
+//output: 0 2 4 6 8 1012345678
+```
+
+`unique()`适配器消除了迭代器的重复。 重复项不需要顺序。
+
+```
 extern crate itertools;
 use itertools::Itertools;
 
@@ -409,12 +408,12 @@ for d in unique {
   print!("{} ", d);
 }
 
-//output: 1 4 3 2 5
+//output: 1 4 3 2 51234567891011
 ```
 
-The `join()` adaptor combines iterator elements into a single string with a separator in between the elements.
+`join()`适配器将迭代器元素组合为单个字符串，元素之间有一个分隔符。
 
-```rust
+```
 extern crate itertools;
 use itertools::Itertools;
 
@@ -422,22 +421,21 @@ let creatures = vec!["banshee", "basilisk", "centaur"];
 let list = creatures.iter().join(", ");
 println!("In the enchanted forest, we found {}.", list);
 
-// output: In the enchanted forest, we found banshee, basilisk, centaur.
+// output: In the enchanted forest, we found banshee, basilisk, centaur.12345678
 ```
 
-The `sorted_by()` adaptor applies custom sorting order to iterator elements, returning a sorted vector. The following program will print out top 5 happiest countries, according to [2018 World Happiness Report](http://worldhappiness.report/ed/2018/).
+`sorted_by()`适配器将自定义排序顺序应用于迭代器元素，返回排序后的向量。 根据2016年“世界幸福指数”，以下计划将打印出前5名最幸福的国家。
 
-> `sorted_by()` uses [Ordering trait](https://doc.rust-lang.org/nightly/core/cmp/enum.Ordering.html) to sort elements.
+> sorted_by() 使用[Ordering trait](https://doc.rust-lang.org/nightly/core/cmp/enum.Ordering.html)排序
 
-```rust
+```
 extern crate itertools;
 use itertools::Itertools;
 
-let happiness_index = vec![
-    ("Canada", 7), ("Iceland", 4), ("Netherlands", 6),
-    ("Finland", 1), ("New Zealand", 8), ("Denmark", 3),
-    ("Norway", 2), ("Sweden", 9), ("Switzerland", 5)
-  ];
+let happiness_index = vec![ ("Austria", 12), ("Costa Rica", 14), ("Norway", 4),
+  ("Australia", 9), ("Netherlands", 7), ("New Zealand", 8), ("United States", 13),
+  ("Israel", 11), ("Denmark", 1), ("Finland", 5), ("Iceland", 3),
+  ("Sweden", 10), ("Canada", 6), ("Puerto Rico", 15), ("Switzerland", 2) ];
 
 let top_contries = happiness_index
   .into_iter()
@@ -450,55 +448,54 @@ for (country, rating) in top_contries {
 }
 
 // output:
-// # 1: Finland
-// # 2: Norway
-// # 3: Denmark
-// # 4: Iceland
-// # 5: Switzerland
+// # 1: Denmark
+// # 2: Switzerland
+// # 3: Iceland
+// # 4: Norway
+// # 5: Finland123456789101112131415161718192021222324
 ```
 
-## Creating Your Own Iterators
+# 9.定制迭代器（Creating Your Own Iterators）
 
-Beautiful thing about Rust is that you can use generic language facilities to extend it. Let us leverage this awesome power and create our own iterator! We will build a very simple iterator that produces a series of pairs of temperatures `(Fahrenheit, Celsius)`, represented by a tuple of floating-point numbers `(f32, f32)`. The temperature is calculated using commonly known formula: `°C = (°F - 32) / 1.8`.
+Rust的优点在于，你可以使用通用语言工具来扩展它。 让我们利用这个强大的力量，创造我们自己的迭代器！ 我们将构建一个非常简单的迭代器，产生一系列由浮点数`(f32，f32)`组成的温度`(华氏，摄氏)`对。 温度使用公知的公式计算：`°C =(°F-32)/ 1.8`。
 
-An iterator starts with a `struct`. Whatever we name the `struct` will also be the name of the iterator. We will call ours `FahrToCelc`. The `struct` contains fields that hold useful information that persists between subsequent iterator calls. We will have two `f32` fields - the temperature in Fahrenheit, and the increment step:
+迭代器以一个结构体(struct)开始。 我们命名的结构体名称也将是迭代器的名称。 我们将调用`FahrToCelc`。 该结构体包含一些有用的信息，这些信息在随后的迭代器调用之间保持不变。 我们将有两个 `f32 fields` : 华氏温度和增量步长：
 
-```rust
+```
 struct FahrToCelc {
   fahr: f32,
   step: f32,
-}
+}1234
 ```
 
-Next, we will create a convenience method `new()` that initializes the iterator by passing it initial values for temperature in Fahrenheit and the increment step. This method is strictly speaking not necessary and is not part of the iterator implementation, but I find it to be a nice syntactic sugar that improves overall program readability:
+接下来，我们将创建一个的方法`new()`，它通过初始化迭代器的初始值以华氏温度和增量步长进行初始化。 这个方法严格来说不是必须的，不是迭代器实现的一部分，但是我觉得它是一个很好的语法糖，可以提高程序的整体可读性：
 
-```rust
+```
 impl FahrToCelc {
   fn new(fahr: f32, step: f32) -> FahrToCelc {
     FahrToCelc { fahr: fahr, step: step }
   }
-}
+}12345
 ```
 
-Finally, we program the behavior of the iterator by implementing the `Iterator` trait for our `struct`. The trait at a minimum needs to contain the following:
+最后，我们通过为结构实现`Iterator Trait`来编写迭代器的行为。 至少需要包含以下内容：
 
-- Definition of the `Item` type. It describes what kind of things the iterator will produce. As mentioned before our iterator produces temperature pairs `(Fahrenheit, Celsius)` represented by a tuple of floating-point numbers `(f32, f32)`, so our `Item` type definition will look like this:
+- 定义`Item`类型。 它描述了迭代器将产生什么样的东西。 如前所述，我们的迭代器产生由浮点数`(f32，f32)`元组表示的温度对`(华氏，摄氏)`，所以我们的`Item`类型定义如下所示：
 
-```rust
-type Item = (f32, f32);
+```
+ type Item = (f32, f32);1
 ```
 
-- Function `next()` that actually generates the next `Item`. `next()` takes a mutable reference to `self` and returns an `Option` encapsulating the next value. The reason why we have to return an `Option` and not the item itself is because many iterators need to account for the situation where they have reached the end of the sequence, in which case they return `None`. Since our iterator generates an infinite sequence, our `next()` method will always return `Option<Self::Item>`. Thus, our `next()` function declaration looks like this:
+- 函数`next()`实际上会生成下一个`Item`。 `next()`对`self`进行可变引用( mutable reference)，并返回一个封装下一个值的`Option`。 我们必须返回一个选项而不是项目本身的原因是因为许多迭代器需要考虑它们已经达到序列结束的情况，在这种情况下它们返回`None`。 由于我们的迭代器生成一个无限序列，我们的next()方法将始终返回`Option <Self :: Item>`。 因此，我们的`next()`函数声明如下所示：
 
-```rust
-fn next (&mut self) -> Option<Self::Item>
+```
+fn next (&mut self) -> Option<Self::Item>1
 ```
 
-The `next()` function typically also does some internal housekeeping. Ours increments Fahrenheit temperature `fahr` by `step` so that it can be returned on subsequent iteration. Making these modifications to internal fields is the reason why we need to pass a *mutable* reference to `self` as a parameter to `next()`.
+`next()`函数通常也会进行一些内部管理。 我们逐步增加华氏温度`fahr`，以便在随后的迭代中返回。 对内部字段进行这些修改是我们需要将`self`的可变引用传递给`next()`作为参数的原因。 
+ 结合在一起，这里是迭代器特征的实现：
 
-Combining things together, here is the `Iterator` trait implementation:
-
-```rust
+```
 impl Iterator for FahrToCelc {
   type Item = (f32, f32);
 
@@ -508,10 +505,10 @@ impl Iterator for FahrToCelc {
     self.fahr = self.fahr + self.step;
     Some((curr_fahr, curr_celc))
   }
-}
+}12345678910
 ```
 
-At last, the complete program:
+最终的完整程序如下：
 
 ```rust
 struct FahrToCelc {
