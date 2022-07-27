@@ -31,7 +31,7 @@ export RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
 
 ## cargo 换源：
 
-新建（或编辑已有）文件 **`cat $HOME/.cargo/config`**，写入：        
+新建（或编辑已有）文件 **`vim $HOME/.cargo/config`**，写入：        
 ```
 [source.crates-io]  
 registry = "https://github.com/rust-lang/crates.io-index"  
